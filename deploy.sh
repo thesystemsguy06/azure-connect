@@ -83,6 +83,9 @@ fi
 echo "  Module ready: $WORK_DIR"
 
 # ── Step 2: Pairing Code (with retry) ────────────────────────────────
+# Accept pairing code as $1 for zero-friction "paste & enter" flow.
+# Falls back to interactive prompt if $1 is not provided.
+INLINE_CODE="${1:-}"
 MAX_CODE_ATTEMPTS=3
 ATTEMPT=0
 BODY=""
@@ -90,9 +93,17 @@ BODY=""
 while [ $ATTEMPT -lt $MAX_CODE_ATTEMPTS ]; do
     ATTEMPT=$((ATTEMPT + 1))
 
-    echo ""
-    read -p "Enter pairing code from dashboard (e.g. VP-XXXX): " USER_CODE
-    USER_CODE=$(echo "$USER_CODE" | tr '[:lower:]' '[:upper:]' | xargs)
+    if [ -n "$INLINE_CODE" ] && [ $ATTEMPT -eq 1 ]; then
+        # Zero-friction mode: pairing code was embedded in the bootstrap command
+        USER_CODE=$(echo "$INLINE_CODE" | tr '[:lower:]' '[:upper:]' | xargs)
+        echo ""
+        echo "  Using pairing code: $USER_CODE"
+    else
+        # Interactive mode: prompt user for the code
+        echo ""
+        read -p "Enter pairing code from dashboard (e.g. VP-XXXX): " USER_CODE
+        USER_CODE=$(echo "$USER_CODE" | tr '[:lower:]' '[:upper:]' | xargs)
+    fi
 
     if [ -z "$USER_CODE" ]; then
         echo "No code entered."
@@ -120,6 +131,16 @@ while [ $ATTEMPT -lt $MAX_CODE_ATTEMPTS ]; do
 
     ERROR_MSG=$(echo "$BODY" | jq -r '.detail // "Unknown error"' 2>/dev/null || echo "$BODY")
     echo "Error: $ERROR_MSG"
+
+    # In non-interactive mode ($1 was provided), don't retry with the same consumed code
+    if [ -n "$INLINE_CODE" ]; then
+        if [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "410" ]; then
+            echo ""
+            echo "This pairing code is no longer valid."
+            echo "Return to your VectorPlane dashboard to generate a new session."
+            exit 1
+        fi
+    fi
 
     if [ "$HTTP_CODE" = "410" ]; then
         echo ""
