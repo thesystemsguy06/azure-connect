@@ -58,7 +58,7 @@ resource "azuread_service_principal" "vectorplane" {
 
 resource "azuread_application_federated_identity_credential" "vectorplane" {
   application_id = azuread_application.vectorplane.id
-  display_name   = "VectorPlane WIF"
+  display_name   = "vectorplane-wif"
   description    = "Trust VectorPlane OIDC IdP for zero-secret authentication"
 
   issuer    = var.vectorplane_oidc_issuer
